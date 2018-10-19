@@ -2,6 +2,7 @@
   "name": "ngx-bootstrap-base",
   "version": "3.0.1",
   "description": "Native Angular Bootstrap Components",
+  "schematics": "./schematics/src/collection.json",
   "private": true,
   "scripts": {
     "lite-server": "lite-server -c scripts/bs-config.js",
