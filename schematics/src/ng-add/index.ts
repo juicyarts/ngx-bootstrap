@@ -6,20 +6,19 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import { addImportToModule } from '@schematics/angular/utility/ast-utils';
-import { chain, noop, Rule, SchematicContext, SchematicsException, Tree } from '@angular-devkit/schematics';
+import { chain, noop, Rule, SchematicContext, Tree } from '@angular-devkit/schematics';
 import { getWorkspace } from '@schematics/angular/utility/config';
 import { Schema } from './schema';
 import { WorkspaceProject, WorkspaceSchema } from '@angular-devkit/core/src/workspace';
 
 import {
+  addModuleImportToRootModule,
   addPackageToPackageJson,
   addStyleToTarget,
   getProjectFromWorkspace,
   installPackageJsonDependencies
 } from '../utils';
-import { InsertChange, Change } from '@schematics/angular/utility/change';
-import * as ts from 'typescript';
+
 import { getAppModulePath } from '@schematics/angular/utility/ng-ast-utils';
 import { getProjectMainFile } from '../utils/project-main-file';
 import { hasNgModuleImport } from '../utils/ng-module-imports';
@@ -34,85 +33,51 @@ export default function (options: Schema): Rule {
     addStyles(options),
     addPackageJsonDependencies(),
     installPackageJsonDependencies(),
-    options.component ? addComponentModule(options) : noop()
+    options.component ? addModuleOfComponent(options.project, options.component) : noop()
   ]);
 }
 
-function addComponentModule(options: Schema) {
+function addModuleOfComponent(projectName: string | undefined, componentName: string) {
 
-  const modules: { [key: string]: string } = {
-    alert: 'AlertModule',
-    buttons: 'ButtonsModule',
-    carousel: 'CarouselModule',
-    collapse: 'CollapseModule',
-    datepicker: 'BsDatepickerModule',
-    dropdown: 'BsDropdownModule',
-    modal: 'ModalModule',
-    pagination: 'PaginationModule',
-    popover: 'PopoverModule',
-    progressbar: 'ProgressbarModule',
-    rating: 'RatingModule',
-    sortable: 'SortableModule',
-    tabs: 'TabsModule',
-    timepicker: 'TimepickerModule',
-    tooltip: 'TooltipModule',
-    typeahead: 'TypeaheadModule'
+  const components: { [key: string]: { moduleName: string; link: string } } = {
+    accordion: { moduleName: 'AccordionModule', link: 'ngx-bootstrap/accordion' },
+    alerts: { moduleName: 'AlertModule', link: 'ngx-bootstrap/alert' },
+    buttons: { moduleName: 'ButtonsModule', link: 'ngx-bootstrap/buttons' },
+    carousel: { moduleName: 'CarouselModule', link: 'ngx-bootstrap/carousel' },
+    collapse: { moduleName: 'CollapseModule', link: 'ngx-bootstrap/collapse' },
+    datepicker: { moduleName: 'BsDatepickerModule', link: 'ngx-bootstrap/datepicker' },
+    dropdowns: { moduleName: 'BsDropdownModule', link: 'ngx-bootstrap/dropdown' },
+    modals: { moduleName: 'ModalModule', link: 'ngx-bootstrap/modal' },
+    pagination: { moduleName: 'PaginationModule', link: 'ngx-bootstrap/pagination' },
+    popover: { moduleName: 'PopoverModule', link: 'ngx-bootstrap/popover' },
+    progressbar: { moduleName: 'ProgressbarModule', link: 'ngx-bootstrap/progressbar' },
+    rating: { moduleName: 'RatingModule', link: 'ngx-bootstrap/rating' },
+    sortable: { moduleName: 'SortableModule', link: 'ngx-bootstrap/sortable' },
+    tabs: { moduleName: 'TabsModule', link: 'ngx-bootstrap/tabs' },
+    timepicker: { moduleName: 'TimepickerModule', link: 'ngx-bootstrap/timepicker' },
+    tooltip: { moduleName: 'TooltipModule', link: 'ngx-bootstrap/tooltip' },
+    typeahead: { moduleName: 'TypeaheadModule', link: 'ngx-bootstrap/typeahead' }
   };
 
 
   return (host: Tree) => {
     const workspace = getWorkspace(host);
-    const project = getProjectFromWorkspace(workspace, options.project);
+    const project = getProjectFromWorkspace(workspace, projectName);
     const appModulePath = getAppModulePath(host, getProjectMainFile(project));
 
-    if (options.component) {
-      if (hasNgModuleImport(host, appModulePath, 'NoopComponentModule')) {
+    if (componentName && components[componentName]) {
+      if (hasNgModuleImport(host, appModulePath, components[componentName].moduleName)) {
         /* tslint:disable-next-line: no-console */
-        return console.warn(`Could not set up ${options.component}` +
-          `because NoopComponentModule is already imported. Please manually ` +
-          `set up browser animations.`);
+        return console.warn(`Could not set up ${components[componentName].moduleName} because it already imported.`);
       }
 
-      addModuleImportToRootModule(host, modules[options.component], `ngx-bootstrap/${options.component}`, project);
+      addModuleImportToRootModule(
+        host, `${components[componentName].moduleName}.forRoot()`, components[componentName].link, project
+      );
     }
 
     return host;
   };
-}
-
-export function addModuleImportToRootModule(host: Tree, moduleName: string, src: string, project: WorkspaceProject) {
-  const modulePath = getAppModulePath(host, getProjectMainFile(project));
-  addModuleImportToModule(host, modulePath, moduleName, src);
-}
-
-export function addModuleImportToModule(host: Tree, modulePath: string, moduleName: string, src: string) {
-
-  const moduleSource = getSourceFile(host, modulePath);
-
-  if (!moduleSource) {
-    throw new SchematicsException(`Module not found: ${modulePath}`);
-  }
-
-  const changes: Change[] = addImportToModule(moduleSource, modulePath, moduleName, src);
-  const recorder = host.beginUpdate(modulePath);
-
-  changes.forEach((change: Change) => {
-    if (change instanceof InsertChange) {
-      recorder.insertLeft(change.pos, change.toAdd);
-    }
-  });
-
-  host.commitUpdate(recorder);
-}
-
-export function getSourceFile(host: Tree, path: string) {
-  const buffer = host.read(path);
-  if (!buffer) {
-    throw new SchematicsException(`Could not find file for path: ${path}`);
-  }
-  const content = buffer.toString();
-
-  return ts.createSourceFile(path, content, ts.ScriptTarget.Latest, true);
 }
 
 function addPackageJsonDependencies(): Rule {

@@ -40,13 +40,15 @@ export function hasNgModuleImport(tree: Tree, modulePath: string, className: str
     throw new Error(`Could not find NgModule declaration inside: "${modulePath}"`);
   }
 
+  /* tslint:disable-next-line: no-non-null-assertion */
   for (const property of ngModuleMetadata!.properties) {
     if (!ts.isPropertyAssignment(property) || property.name.getText() !== 'imports' ||
         !ts.isArrayLiteralExpression(property.initializer)) {
       continue;
     }
 
-    if (property.initializer.elements.some(element => element.getText() === className)) {
+    /* tslint:disable-next-line: no-any */
+    if (property.initializer.elements.some((element: any) => element.getText() === className)) {
       return true;
     }
   }
@@ -76,5 +78,6 @@ function isNgModuleCallExpression(callExpression: ts.CallExpression): boolean {
   }
 
   const decoratorIdentifier = resolveIdentifierOfExpression(callExpression.expression);
+
   return decoratorIdentifier ? decoratorIdentifier.text === 'NgModule' : false;
 }
